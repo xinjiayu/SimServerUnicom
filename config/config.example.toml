@@ -1,0 +1,30 @@
+# 服务系统设置
+[system]
+    logPath = "./log"
+    port = "8189"
+
+# 数据库配置
+[database]
+    [[database.default]]
+        host = "127.0.0.1"
+        port = "3306"
+        user = "root"
+        pass = "root"
+        name = "simdb"
+        type = "mysql"
+        max-idle     = "10"
+        max-open     = "10"
+        max-lifetime = "30"
+        debug = "false"
+
+# 使用的数据表名配置
+[datatable]
+    flow_table = "sim_flow"
+    info_table = "sim_unicom"
+    notice_table = "unicom_notice"
+
+# 联通物联网平台配置
+[unicom]
+    api_url = "https://api.10646.cn/rws/api/v1/"
+    api_key = "xxxxxxxxxxxxxxxx"
+    api_user = "xxxxxxxxxxxxxxx"
