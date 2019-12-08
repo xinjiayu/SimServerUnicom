@@ -25,7 +25,6 @@ type AutoChangePlan struct {
 	PlanList      map[string]analyse.PlanInfo
 }
 
-
 //AutoSetupInit 自动初始化sim卡的设置 ，为1g套餐
 func (ac *AutoChangePlan) AutoSetupPlanInit() (error, int) {
 	num := 0
@@ -95,7 +94,7 @@ func toSetupPlan(planNum int) (map[string]analyse.PlanSimCardInfo, int) {
 		switch planNum {
 		case 1:
 			for k1, v1 := range simPlan01List {
-				f1 := v1.Flow /utils.MB1
+				f1 := v1.Flow / utils.MB1
 				if f1 > 1024 && f1 < 3072 {
 					v1.PlanName = plan02
 					simPlan02List[v1.Iccid] = v1
@@ -195,7 +194,7 @@ func getListCountInfo(simList map[string]analyse.PlanSimCardInfo, planNum int64)
 	lastMonth := gtime.Now().AddDate(0, -1, 0).Format("n") //上个月
 	nextMonth := gtime.Now().AddDate(0, +1, 0).Format("n") //上个月
 	//计费周期开始日期
-	startDayStr := yearNumStr + "-" + monthNum + "-27" //开始日期
+	startDayStr := yearNumStr + "-" + monthNum + "-27"     //开始日期
 	endDayStr := gconv.String(gtime.Now().Format("Y-m-d")) //结束日期
 
 	if gconv.Int(gtime.Now().Format("j")) < 27 {
@@ -248,7 +247,12 @@ func getListCountInfo(simList map[string]analyse.PlanSimCardInfo, planNum int64)
 	planInfo.AllFlow = planFlow / utils.MB1
 	planInfo.UseFlow = useFlow / utils.MB1
 	planInfo.AveDayFlow = useFlow / useDayNum / utils.MB1
-	planInfo.AveSimUseFlow = useFlow / gconv.Int64(len(simList)) / utils.MB1
+
+	planInfo.AveSimUseFlow = 0
+	if gconv.Int64(len(simList)) > 0 {
+		planInfo.AveSimUseFlow = useFlow / gconv.Int64(len(simList)) / utils.MB1
+	}
+
 	planInfo.SurplusFlow = surplusFlow / utils.MB1
 	planInfo.OutFlow = outFlow / utils.MB1
 	planInfo.RemainderDayNum = remainderDayNum
@@ -270,7 +274,7 @@ func (ac *AutoChangePlan) AutoSetupPlan() (error, int) {
 		if c > 0 {
 			bList, _ := toSetupPlan(c)
 			for _, v1 := range aList {
-				glog.Info("计划改变的卡：",  v1)
+				glog.Info("计划改变的卡：", v1)
 				//go startToChangePlan(v1.Iccid, v1.PlanName)
 
 			}
@@ -334,4 +338,3 @@ func Sort(array []analyse.PlanSimCardInfo) []analyse.PlanSimCardInfo {
 	}
 	return array
 }
-
