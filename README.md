@@ -99,6 +99,10 @@ start|stop|restart|status|tail
 
 说明：直接调用，后台自动执行。
 
+3、Change19to20 将sim卡从19位转换为20位的接口
+调用地址`/unicom/op/change19to20`
+谳用参数为：iccid 不能为空。
+
 
 ### 接收通知接口
 1、DataReceive 通知数据接收

@@ -39,3 +39,15 @@ func (c *Controller) ChangeInitPlan(r *ghttp.Request) {
 
 }
 
+//
+func (c *Controller) Change19to20(r *ghttp.Request) {
+	iccid := r.GetString("iccid")
+	if iccid == "" {
+		response.Json(r, -1, "19位的iccid号码不能为空！", "")
+	}
+
+	numberStr := serviceOperate.LuhnNext(iccid)
+
+	response.Json(r, 0, "sim卡20位号码", iccid+gconv.String(numberStr))
+
+}
