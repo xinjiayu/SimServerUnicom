@@ -81,7 +81,9 @@ func toSetupPlan(planNum int) (map[string]analyse.PlanSimCardInfo, int) {
 
 	}
 
-	planInfo := getListCountInfo(simPlan01List, 1)
+	planInfo := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
+
+	//planInfo := getListCountInfo(simPlan01List, 1)
 
 	//glog.Info("=====调整前=====")
 	if planInfo.OutFlow > 0 {
@@ -104,8 +106,8 @@ func toSetupPlan(planNum int) (map[string]analyse.PlanSimCardInfo, int) {
 				}
 
 			}
-
-			p2 := getListCountInfo(simPlan02List, 2)
+			p2 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
+			//p2 := getListCountInfo(simPlan02List, 2)
 			if p2.OutFlow > 0 {
 				continuePlan = 2
 			}
@@ -123,7 +125,8 @@ func toSetupPlan(planNum int) (map[string]analyse.PlanSimCardInfo, int) {
 				}
 
 			}
-			p2 := getListCountInfo(simPlan02List, 2)
+			//p2 := getListCountInfo(simPlan02List, 2)
+			p2 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
 			if p2.OutFlow > 0 {
 				continuePlan = 3
 			}
@@ -155,12 +158,13 @@ func toSetupPlan(planNum int) (map[string]analyse.PlanSimCardInfo, int) {
 				}
 
 			}
-			p2 := getListCountInfo(simPlan02List, 3)
+			p2 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
+			//p2 := getListCountInfo(simPlan02List, 3)
 			glog.Info(getPlanName(3), p2)
 
 		}
-
-		p1 := getListCountInfo(simPlan01List, gconv.Int64(planNum))
+		p1 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
+		//p1 := getListCountInfo(simPlan01List, gconv.Int64(planNum))
 		if p1.OutFlow > 0 {
 			continuePlan = planNum
 		}
