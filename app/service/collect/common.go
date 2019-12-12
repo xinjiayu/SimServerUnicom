@@ -51,6 +51,7 @@ func getAPIDataBody(APIURL string) ([]byte, error) {
 		return body, nil
 	}
 }
+
 //getAPIData 通过api获取数据
 func getAPIData(APIURL string, dataModel interface{}) error {
 
@@ -89,7 +90,7 @@ func PutAPIData(apiUrl, content string, dataModel interface{}) {
 		glog.Info(r.StatusCode)
 		//glog.Info(r.Request.GetBody)
 		body := []byte(r.ReadAllString())
-		//glog.Info(apiUrl, body)
+		glog.Info(apiUrl, body)
 		Err := json.Unmarshal(body, &dataModel)
 		if Err != nil {
 			glog.Error(Err)

@@ -1,6 +1,8 @@
 package operate
 
 import (
+	"github.com/gogf/gf/container/gmap"
+	"github.com/gogf/gf/database/gdb"
 	"github.com/gogf/gf/frame/g"
 	"github.com/gogf/gf/os/glog"
 	"github.com/gogf/gf/os/gtime"
@@ -18,11 +20,8 @@ const plan02 = "831WLW016555_MON-FLEX_2048M_SP"
 const plan03 = "831WLW016555_MON-FLEX_3072M_SP"
 
 type AutoChangePlan struct {
-	SimCardLIst   []analyse.PlanSimCardInfo
-	SimPlan01List map[string]analyse.PlanSimCardInfo
-	SimPlan02List map[string]analyse.PlanSimCardInfo
-	SimPlan03List map[string]analyse.PlanSimCardInfo
-	PlanList      map[string]analyse.PlanInfo
+	PlanInfo        map[string]analyse.PlanInfo
+	PlanListSimList *gmap.AnyAnyMap
 }
 
 //AutoSetupInit 自动初始化sim卡的设置 ，为1g套餐
@@ -55,82 +54,64 @@ func (ac *AutoChangePlan) GetNot01PlanNum() int {
 }
 
 //AutoSetupPlan 自动设置sim卡套餐
-func toSetupPlan(planNum int) (map[string]analyse.PlanSimCardInfo, int) {
-
-	//不需要调整的
-	var simPlan01List = make(map[string]analyse.PlanSimCardInfo)
+func (ac *AutoChangePlan) toSetupPlan(planNum int) (map[string]datamodel.SimUnicom, int) {
 	//需求调整的
-	var simPlan02List = make(map[string]analyse.PlanSimCardInfo)
+	var simPlan02List = make(map[string]datamodel.SimUnicom)
 	//是否继续进行调节
 	continuePlan := 0
-	a1, _ := datamodel.SimUnicom{}.GetUnicomSimInfoListByPlan(getPlanName(planNum))
-	if a1 == nil {
+	aListData := ac.PlanListSimList.Get(getPlanName(planNum))
+	if aListData == nil {
 		return nil, 0
 	}
-	glog.Info("全部卡数：", len(a1))
-	for _, v := range a1 {
-		simInfo := new(unicommodel.SimInfo)
-		planSimInfo := analyse.PlanSimCardInfo{}
+	aList := gconv.Map(aListData)
 
-		v.Struct(simInfo)
-		planSimInfo.Iccid = simInfo.Iccid
-		planSimInfo.Flow = simInfo.CtdDataUsage
-		planSimInfo.PlanName = simInfo.RatePlan
+	planInfo := ac.PlanInfo[getPlanName(planNum)]
 
-		simPlan01List[simInfo.Iccid] = planSimInfo
-
-	}
-
-	planInfo := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
-
-	//planInfo := getListCountInfo(simPlan01List, 1)
-
-	//glog.Info("=====调整前=====")
 	if planInfo.OutFlow > 0 {
 		var newListAllFlow int64 = 0
 		var newListAllNum int64 = 0
 
-		//glog.Info("*******调整后********")
-		//glog.Info(getPlanName(planNum), getListCountInfo(simPlan01List, gconv.Int64(planNum)))
-
 		switch planNum {
 		case 1:
-			for k1, v1 := range simPlan01List {
-				f1 := v1.Flow / utils.MB1
-				if f1 > 1024 && f1 < 3072 {
-					v1.PlanName = plan02
-					simPlan02List[v1.Iccid] = v1
+			for k1, v1 := range aList {
+				simInfo := datamodel.SimUnicom{}
+				gconv.Struct(v1, &simInfo)
+
+				f1 := simInfo.CtdDataUsage / utils.MB1
+				if f1 > 3072 {
+					simInfo.RatePlan = plan02
+					simPlan02List[simInfo.Iccid] = simInfo
 					newListAllNum++
-					newListAllFlow = newListAllFlow + v1.Flow
-					delete(simPlan01List, k1)
+					newListAllFlow = newListAllFlow + simInfo.CtdDataUsage
+					delete(aList, k1)
 				}
 
 			}
-			p2 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
-			//p2 := getListCountInfo(simPlan02List, 2)
-			if p2.OutFlow > 0 {
+			p := ac.PlanInfo[getPlanName(planNum)]
+			if p.OutFlow > 0 {
 				continuePlan = 2
 			}
-			glog.Info(getPlanName(2), p2)
+			glog.Info("计划一：", getPlanName(1), p)
 
 		case 2:
-			for k1, v1 := range simPlan01List {
-				f1 := v1.Flow / utils.MB1
-				if f1 > 2048 && f1 < 4096 {
-					v1.PlanName = plan03
-					simPlan02List[v1.Iccid] = v1
+			for k1, v1 := range aList {
+				simInfo := datamodel.SimUnicom{}
+				gconv.Struct(v1, &simInfo)
+				f1 := simInfo.CtdDataUsage / utils.MB1
+				if f1 > 4096 {
+					simInfo.RatePlan = plan03
+					simPlan02List[simInfo.Iccid] = simInfo
 					newListAllNum++
-					newListAllFlow = newListAllFlow + v1.Flow
-					delete(simPlan01List, k1)
+					newListAllFlow = newListAllFlow + simInfo.CtdDataUsage
+					delete(aList, k1)
 				}
 
 			}
-			//p2 := getListCountInfo(simPlan02List, 2)
-			p2 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
-			if p2.OutFlow > 0 {
+			p := ac.PlanInfo[getPlanName(planNum)]
+			if p.OutFlow > 0 {
 				continuePlan = 3
 			}
-			glog.Info(getPlanName(2), p2)
+			glog.Info("计划二：", getPlanName(2), p)
 
 		case 3:
 			var simnum1 int64 = 1
@@ -140,33 +121,35 @@ func toSetupPlan(planNum int) (map[string]analyse.PlanSimCardInfo, int) {
 				simnum1 = outFlowNum1 + 1
 			}
 
-			var i0 int64 = 0
-			a0, _ := datamodel.SimUnicom{}.GetUnicomSimInfoListByPlan(getPlanName(1))
-			for _, v1 := range a0 {
-				simInfo2 := new(unicommodel.SimInfo)
-				v1.Struct(simInfo2)
-				if simInfo2.CtdDataUsage < 0 {
-					if i0 < simnum1 {
-						planSimInfo := analyse.PlanSimCardInfo{}
-						planSimInfo.Iccid = simInfo2.Iccid
-						planSimInfo.PlanName = plan03
-						planSimInfo.Flow = simInfo2.CtdDataUsage
-						simPlan02List[simInfo2.Iccid] = planSimInfo
+			var cnt int64 = 0
+			//a0, _ := ac.PlanListSimList[plan01]
+			a1 := ac.PlanListSimList.Get(plan01)
+
+			if a1 == nil {
+				return nil, 0
+			}
+			aList := gconv.Map(a1)
+			for k1, v1 := range aList {
+				simInfo := datamodel.SimUnicom{}
+				gconv.Struct(v1, &simInfo)
+				if simInfo.CtdDataUsage/utils.MB1 < 500 {
+					if cnt < simnum1 {
+						simInfo.RatePlan = plan03
+						simPlan02List[simInfo.Iccid] = simInfo
+						delete(aList, k1)
+
 					}
 
-					i0++
+					cnt++
 				}
 
 			}
-			p2 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
-			//p2 := getListCountInfo(simPlan02List, 3)
-			glog.Info(getPlanName(3), p2)
+			p := ac.PlanInfo[getPlanName(planNum)]
+			if p.OutFlow > 0 {
+				continuePlan = 3
+			}
+			glog.Info("计划三有超出：", getPlanName(3), p)
 
-		}
-		p1 := datamodel.SimUnicom{}.PlanCountInfo(getPlanName(gconv.Int(planNum)))
-		//p1 := getListCountInfo(simPlan01List, gconv.Int64(planNum))
-		if p1.OutFlow > 0 {
-			continuePlan = planNum
 		}
 
 	}
@@ -190,122 +173,35 @@ func getPlanName(num int) string {
 	return ""
 }
 
-func getListCountInfo(simList map[string]analyse.PlanSimCardInfo, planNum int64) analyse.PlanInfo {
-
-	//计算计费周期
-	yearNumStr := gtime.Now().Format("Y")
-	monthNum := gtime.Now().Format("n")
-	lastMonth := gtime.Now().AddDate(0, -1, 0).Format("n") //上个月
-	nextMonth := gtime.Now().AddDate(0, +1, 0).Format("n") //上个月
-	//计费周期开始日期
-	startDayStr := yearNumStr + "-" + monthNum + "-27"     //开始日期
-	endDayStr := gconv.String(gtime.Now().Format("Y-m-d")) //结束日期
-
-	if gconv.Int(gtime.Now().Format("j")) < 27 {
-		startDayStr = yearNumStr + "-" + lastMonth + "-27"
-		//到本月26日
-		endDayStr = yearNumStr + "-" + gconv.String(monthNum) + "-26"
-	} else {
-		startDayStr = yearNumStr + "-" + monthNum + "-27"
-		//到下个月26日
-		endDayStr = yearNumStr + "-" + gconv.String(nextMonth) + "-26"
-	}
-
-	dayStr := gtime.Now().AddDate(0, 0, 0).Format("Y-m-d")
-
-	//计算已使用的天数
-	a, _ := time.Parse("2006-01-02", dayStr)
-	b, _ := time.Parse("2006-01-02", startDayStr)
-	useDayNumtmp := utils.TimeSub(a, b)
-	//已使用的天数
-	useDayNum := gconv.Int64(useDayNumtmp)
-
-	//计算剩余的天数
-	a2, _ := time.Parse("2006-01-02", endDayStr)
-	b2, _ := time.Parse("2006-01-02", dayStr)
-	remainderDayNumTmp := utils.TimeSub(a2, b2)
-	//剩余天数
-	remainderDayNum := gconv.Int64(remainderDayNumTmp)
-
-	var useFlow int64 = 0
-	for _, v := range simList {
-		useFlow = useFlow + v.Flow
-	}
-
-	////计算总流量
-	planFlow := gconv.Int64(len(simList)) * planNum * utils.MB1
-	//剩余流量
-	var surplusFlow int64 = 0
-	//超出流量
-	var outFlow int64 = 0
-	//计算剩余流量
-	surplusFlow = planFlow - useFlow
-	if surplusFlow < 0 {
-		outFlow = utils.Abs(surplusFlow)
-		surplusFlow = 0
-	}
-
-	planInfo := analyse.PlanInfo{}
-	planInfo.PlanName = getPlanName(gconv.Int(planNum))
-	planInfo.Num = len(simList)
-	planInfo.AllFlow = planFlow / utils.MB1
-	planInfo.UseFlow = useFlow / utils.MB1
-	planInfo.AveDayFlow = useFlow / useDayNum / utils.MB1
-
-	planInfo.AveSimUseFlow = 0
-	if gconv.Int64(len(simList)) > 0 {
-		planInfo.AveSimUseFlow = useFlow / gconv.Int64(len(simList)) / utils.MB1
-	}
-
-	planInfo.SurplusFlow = surplusFlow / utils.MB1
-	planInfo.OutFlow = outFlow / utils.MB1
-	planInfo.RemainderDayNum = remainderDayNum
-	planInfo.ExpectFlow = useFlow / useDayNum * remainderDayNum / utils.MB1
-	return planInfo
-}
-
 func (ac *AutoChangePlan) AutoSetupPlan() (error, int) {
-	num := 0
+	simCardList, _ := datamodel.SimUnicom{}.GetUnicomSimInfoList()
+	ac.CountPlanFlow(simCardList)
+	glog.Info("全部卡数：", len(simCardList))
+
+	var changeSimcardList = make(map[string]string)
+
 	for a := 1; a < 4; a++ {
-		aList, c := toSetupPlan(a)
-		glog.Info("计划改变卡的数量：", len(aList))
+		aList, c := ac.toSetupPlan(a)
 		for _, v := range aList {
-			glog.Info("计划改变的卡：", v)
-			//go startToChangePlan(v.Iccid, v.PlanName)
-
+			changeSimcardList[v.Iccid] = v.RatePlan
 		}
-		num = num + len(aList)
 		if c > 0 {
-			bList, _ := toSetupPlan(c)
-			for _, v1 := range aList {
-				glog.Info("计划改变的卡：", v1)
-				//go startToChangePlan(v1.Iccid, v1.PlanName)
-
+			bList, _ := ac.toSetupPlan(c)
+			for _, v1 := range bList {
+				changeSimcardList[v1.Iccid] = v1.RatePlan
 			}
-			num = num + len(bList)
 
-		} else {
-			break
 		}
 
 	}
-	return nil, num
-}
-
-func (ac *AutoChangePlan) changePlanData(simList []analyse.PlanSimCardInfo, plan string, starNumFlow, endNumFlow, num int64) {
-	var i int64 = 0
-	for _, v := range simList {
-		//这儿里执行处理，资费计划转移动作
-		f := gconv.Int64(v.Flow) / utils.MB1
-		if f > starNumFlow && f < endNumFlow {
-			if i < num {
-				glog.Info("变更卡：", v.Iccid, f)
-				//go startToChangePlan(v.Iccid, plan)
-				ac.SimCardLIst = append(ac.SimCardLIst, v)
-			}
-			i++
-		}
+	for cid, plan := range changeSimcardList {
+		glog.Info(cid, plan)
+		go startToChangePlan(cid, plan)
 	}
+
+	glog.Info("sim卡计划变更数：", len(changeSimcardList))
+
+	return nil, len(changeSimcardList)
 }
 
 func toChangePlan(iccid, ratePlan string) *unicommodel.PutResultData {
@@ -314,9 +210,9 @@ func toChangePlan(iccid, ratePlan string) *unicommodel.PutResultData {
 	APIURL := apiurl.(string)
 	getURL := APIURL + "devices/" + iccid
 	searchStr := "{\"ratePlan\":\"" + ratePlan + "\"}"
+	glog.Info("提交", searchStr)
 	dataModel := new(unicommodel.PutResultData)
 	collect.PutAPIData(getURL, searchStr, dataModel)
-	glog.Info(dataModel)
 	return dataModel
 }
 
@@ -341,4 +237,188 @@ func Sort(array []analyse.PlanSimCardInfo) []analyse.PlanSimCardInfo {
 		}
 	}
 	return array
+}
+
+//计算流量池的真实大小：流量池中，当前计算周期新激活卡，是从卡激活的日期到计算结束日按每天流量累计的。
+func (ac *AutoChangePlan) CountPlanFlow(simList gdb.Result) {
+	ac.PlanInfo = make(map[string]analyse.PlanInfo)
+	//ac.PlanListSimList = make(map[string][]datamodel.SimUnicom)
+
+	var simCordList1 = make(map[string]datamodel.SimUnicom)
+	var simCordList2 = make(map[string]datamodel.SimUnicom)
+	var simCordList3 = make(map[string]datamodel.SimUnicom)
+
+	ac.PlanListSimList = gmap.NewAnyAnyMap()
+
+	var flowPoolSize = make(map[string]int64) //池子总量
+	var useFlow = make(map[string]int64)      //池子使用量
+	var simNum = make(map[string]int)         //sim卡的数量
+
+	monthNum := gconv.Int64(gtime.Now().Format("n"))
+	yearNum := gconv.Int64(gtime.Now().Format("Y"))
+	toDayNum := gconv.Int64(gtime.Now().Format("j"))
+
+	startYear := yearNum       //计费周期开始的年
+	startMonth := monthNum - 1 //计划周期开始的月
+
+	if monthNum == 1 {
+		if toDayNum <= 26 {
+			startYear = startYear - 1
+			startMonth = 12
+		}
+	}
+
+	endYear := yearNum   //计费周期结束的年
+	endMonth := monthNum //计划周期结束的月
+	if toDayNum > 26 {
+		endMonth = endMonth + 1
+		if monthNum == 12 {
+			endYear = endYear + 1
+			endMonth = 1
+		}
+	}
+
+	//计费周期开始日期
+	startDayStr := gconv.String(startYear) + "-" + gconv.String(startMonth) + "-27" //计周期开始日期
+	nowDayStr := gconv.String(gtime.Now().Format("Y-m-d"))                          //今天的日期
+	endDayStr := gconv.String(endYear) + "-" + gconv.String(endMonth) + "-26"       //计费周期结束的日期
+
+	//计算计费周期还剩余的天数
+	t1, _ := time.Parse("2006-01-02", endDayStr)
+	t2, _ := time.Parse("2006-01-02", nowDayStr)
+	surplusFlowDayNumTmp := utils.TimeSub(t1, t2)
+	surplusDayNum := gconv.Int64(surplusFlowDayNumTmp)
+
+	//计算已使用的天数
+	a, _ := time.Parse("2006-01-02", nowDayStr)
+	b, _ := time.Parse("2006-01-02", startDayStr)
+	useDayNumtmp := utils.TimeSub(a, b)
+	//已使用的天数
+	useDayNum := gconv.Int64(useDayNumtmp)
+
+	var G1DayFlow int64 = utils.G1 / 30
+	var G2DayFlow int64 = utils.G1 * 2 / 30
+	var G3DayFlow int64 = utils.G1 * 3 / 30
+
+	for _, v := range simList {
+		simInfo := datamodel.SimUnicom{}
+		v.Struct(&simInfo)
+		//计算当前周期内激活卡的池子流量
+		var chargingDayNum int64 = 30
+		tmpTime := gconv.Int64(simInfo.DateActivated)
+		simCardActivatedYear := gconv.Int64(gtime.NewFromTimeStamp(tmpTime).Format("Y"))
+		simCardActivatedMonth := gconv.Int64(gtime.NewFromTimeStamp(tmpTime).Format("n"))
+		if simCardActivatedYear == yearNum && simCardActivatedMonth == monthNum {
+			simCardActivatedDate := gtime.NewFromTimeStamp(tmpTime).Format("Y-m-d")
+			//计算剩余的天数
+			a2, _ := time.Parse("2006-01-02", endDayStr)
+			b2, _ := time.Parse("2006-01-02", simCardActivatedDate)
+			chargingDayNumTmp := utils.TimeSub(a2, b2)
+			chargingDayNum = gconv.Int64(chargingDayNumTmp)
+		}
+
+		switch simInfo.RatePlan {
+		case plan01:
+			flowPoolSize[plan01] = flowPoolSize[plan01] + chargingDayNum*G1DayFlow
+			useFlow[plan01] = useFlow[plan01] + simInfo.CtdDataUsage
+			simCordList1[simInfo.Iccid] = simInfo
+			ac.PlanListSimList.Set(plan01, simCordList1)
+			simNum[plan01]++
+
+		case plan02:
+			flowPoolSize[plan02] = flowPoolSize[plan02] + chargingDayNum*G2DayFlow
+			useFlow[plan02] = useFlow[plan02] + simInfo.CtdDataUsage
+			simCordList2[simInfo.Iccid] = simInfo
+			ac.PlanListSimList.Set(plan02, simCordList2)
+			simNum[plan02]++
+
+		case plan03:
+			flowPoolSize[plan03] = flowPoolSize[plan03] + chargingDayNum*G3DayFlow
+			useFlow[plan03] = useFlow[plan03] + simInfo.CtdDataUsage
+			simCordList3[simInfo.Iccid] = simInfo
+			ac.PlanListSimList.Set(plan03, simCordList3)
+			simNum[plan03]++
+
+		}
+	}
+
+	//1G套餐统计 ===============================
+	planInfo1 := analyse.PlanInfo{}
+	planInfo1.PlanName = plan01
+	planInfo1.AllFlow = flowPoolSize[plan01] / utils.MB1 //池子总量
+	planInfo1.UseFlow = useFlow[plan01] / utils.MB1      //使用量
+	//计算剩余流量
+	surplusFlow := flowPoolSize[plan01] - useFlow[plan01]
+	var outFlow int64 = 0
+	if surplusFlow < 0 {
+		outFlow = utils.Abs(surplusFlow)
+		surplusFlow = 0
+	}
+	planInfo1.SurplusFlow = surplusFlow / utils.MB1                  //余量
+	planInfo1.OutFlow = outFlow / utils.MB1                          //超出量
+	planInfo1.AveDayFlow = planInfo1.UseFlow / useDayNum / utils.MB1 //每天的使用流量
+	planInfo1.Num = simNum[plan01]                                   //sim卡数量
+
+	planInfo1.AveSimUseFlow = 0
+	if simNum[plan01] > 0 {
+		planInfo1.AveSimUseFlow = planInfo1.AveDayFlow / gconv.Int64(simNum[plan01]) / utils.MB1 //计算每天每卡的平均量
+	}
+
+	planInfo1.SurplusDayNum = surplusDayNum //剩余的天数
+	planInfo1.ExpectFlow = planInfo1.AveDayFlow * surplusDayNum / utils.MB1
+	ac.PlanInfo[plan01] = planInfo1
+
+	//2G套餐统计 ===============================
+	planInfo2 := analyse.PlanInfo{}
+	planInfo2.PlanName = plan02
+	planInfo2.AllFlow = flowPoolSize[plan02] / utils.MB1 //池子总量
+	planInfo2.UseFlow = useFlow[plan02] / utils.MB1      //使用量
+	//计算剩余流量
+	surplusFlow2 := flowPoolSize[plan02] - useFlow[plan02]
+	var outFlow2 int64 = 0
+	if surplusFlow2 < 0 {
+		outFlow2 = utils.Abs(surplusFlow2)
+		surplusFlow2 = 0
+	}
+	planInfo2.SurplusFlow = surplusFlow2 / utils.MB1                 //余量
+	planInfo2.OutFlow = outFlow2 / utils.MB1                         //超出量
+	planInfo2.AveDayFlow = planInfo2.UseFlow / useDayNum / utils.MB1 //每天的使用流量
+	planInfo2.Num = simNum[plan02]                                   //sim卡数量
+
+	planInfo2.AveSimUseFlow = 0
+	if simNum[plan02] > 0 {
+		planInfo2.AveSimUseFlow = planInfo2.AveDayFlow / gconv.Int64(simNum[plan02]) / utils.MB1 //计算每天每卡的平均量
+	}
+
+	planInfo2.SurplusDayNum = surplusDayNum //剩余的天数
+	planInfo2.ExpectFlow = planInfo2.AveDayFlow * surplusDayNum / utils.MB1
+
+	ac.PlanInfo[plan02] = planInfo2
+
+	//3G套餐统计 ===============================
+	planInfo3 := analyse.PlanInfo{}
+	planInfo3.PlanName = plan03
+	planInfo3.AllFlow = flowPoolSize[plan03] / utils.MB1 //池子总量
+	planInfo3.UseFlow = useFlow[plan03] / utils.MB1      //使用量
+	//计算剩余流量
+	surplusFlow3 := flowPoolSize[plan03] - useFlow[plan03]
+	var outFlow3 int64 = 0
+	if surplusFlow3 < 0 {
+		outFlow3 = utils.Abs(surplusFlow3)
+		surplusFlow3 = 0
+	}
+	planInfo3.SurplusFlow = surplusFlow3 / utils.MB1                 //余量
+	planInfo3.OutFlow = outFlow3 / utils.MB1                         //超出量
+	planInfo3.AveDayFlow = planInfo3.UseFlow / useDayNum / utils.MB1 //每天的使用流量
+	planInfo3.Num = simNum[plan03]                                   //sim卡数量
+
+	planInfo3.AveSimUseFlow = 0
+	if simNum[plan03] > 0 {
+		planInfo3.AveSimUseFlow = planInfo3.AveDayFlow / gconv.Int64(simNum[plan03]) / utils.MB1 //计算每天每卡的平均量
+	}
+
+	planInfo3.SurplusDayNum = surplusDayNum //剩余的天数
+	planInfo3.ExpectFlow = planInfo3.AveDayFlow * surplusDayNum / utils.MB1
+
+	ac.PlanInfo[plan03] = planInfo3
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/gogf/gf/util/gconv"
 	"github.com/xinjiayu/SimServerUnicom/app/model/analyse"
 	"github.com/xinjiayu/SimServerUnicom/app/model/datamodel"
+	"github.com/xinjiayu/SimServerUnicom/app/service/operate"
 	"github.com/xinjiayu/SimServerUnicom/library/utils"
 )
 
@@ -76,7 +77,7 @@ func TwoFlow() []analyse.TwoDaysFlow {
 }
 
 //分析所有卡的流量列表，可以指定计费套餐
-func SimList(panName string) [] analyse.PlanSimCardInfo {
+func SimList(panName string) []analyse.PlanSimCardInfo {
 
 	monthFlowList := datamodel.SimUnicom{}.FlowList(panName)
 	var SimFlowList []analyse.PlanSimCardInfo
@@ -95,18 +96,23 @@ func SimList(panName string) [] analyse.PlanSimCardInfo {
 
 //分析计费套餐使用情况
 func PlanInfoList() []analyse.PlanInfo {
+
+	simCardList, _ := datamodel.SimUnicom{}.GetUnicomSimInfoList()
+	var op = new(operate.AutoChangePlan)
+	op.CountPlanFlow(simCardList)
+
 	var planInfoList []analyse.PlanInfo
-	planInfo1 := datamodel.SimUnicom{}.PlanCountInfo(datamodel.Plan01)
+	planInfo1 := op.PlanInfo[datamodel.Plan01]
 	if planInfo1.PlanName != "" {
 		planInfoList = append(planInfoList, planInfo1)
 
 	}
-	planInfo2 := datamodel.SimUnicom{}.PlanCountInfo(datamodel.Plan02)
+	planInfo2 := op.PlanInfo[datamodel.Plan02]
 	if planInfo2.PlanName != "" {
 		planInfoList = append(planInfoList, planInfo2)
 
 	}
-	planInfo3 := datamodel.SimUnicom{}.PlanCountInfo(datamodel.Plan03)
+	planInfo3 := op.PlanInfo[datamodel.Plan03]
 	if planInfo3.PlanName != "" {
 		planInfoList = append(planInfoList, planInfo3)
 
@@ -142,8 +148,7 @@ func MonthSimFlowListByIccid(iccid string) analyse.TwoDaysBaySimCardFlow {
 	LastMonthFlowData := gconv.Map(lastMonthFlow)
 	BeforeLastMonthFlowData := gconv.Map(BeforeLastMonthFlow)
 
-
-	lastMonthFlowData := gconv.Int64(LastMonthFlowData["d"+fud.LastMonthDays]) //上个月最后一天的数据
+	lastMonthFlowData := gconv.Int64(LastMonthFlowData["d"+fud.LastMonthDays])                   //上个月最后一天的数据
 	beforeLastMonthFlowData := gconv.Int64(BeforeLastMonthFlowData["d"+fud.BeforeLastMonthDays]) //上上个月最后一天的数据
 
 	for i := 1; i < 32; i++ {

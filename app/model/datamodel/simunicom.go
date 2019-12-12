@@ -5,13 +5,9 @@ import (
 	"github.com/gogf/gf/errors/gerror"
 	"github.com/gogf/gf/frame/g"
 	"github.com/gogf/gf/os/glog"
-	"github.com/gogf/gf/os/gtime"
-	"github.com/gogf/gf/util/gconv"
-	"github.com/xinjiayu/SimServerUnicom/app/model/analyse"
 	"github.com/xinjiayu/SimServerUnicom/app/model/basemodel"
 	"github.com/xinjiayu/SimServerUnicom/app/model/unicommodel"
 	"github.com/xinjiayu/SimServerUnicom/library/utils"
-	"time"
 )
 
 type SimUnicom struct {
@@ -101,159 +97,159 @@ func (model SimUnicom) FlowList(rateplan string) []SimUnicom {
 	return resData
 }
 
-func (model SimUnicom) PlanCountInfo(planName string) analyse.PlanInfo {
-
-	var simList = make(map[string]analyse.PlanSimCardInfo)
-	var resData []SimUnicom
-	var err error
-	if planName != "" {
-		err = model.dbModel().Where(" rateplan = ?", planName).OrderBy("ctddatausage desc").Structs(&resData)
-	} else {
-		err = model.dbModel().Where(" 1 = ?", 1).OrderBy("ctddatausage desc").Structs(&resData)
-	}
-	if err != nil {
-		//glog.Error(model.TableName()+" list error", err)
-		return analyse.PlanInfo{}
-	}
-
-	for _, v := range resData {
-
-		planSimCardInfo := analyse.PlanSimCardInfo{}
-		planSimCardInfo.Flow = v.CtdDataUsage
-		planSimCardInfo.Iccid = v.Iccid
-		planSimCardInfo.PlanName = v.RatePlan
-		simList[v.Iccid] = planSimCardInfo
-
-	}
-
-	//计算每种计费套餐的流量池的真实大小。
-	planPoolFlow := countPlanFlow(resData)
-	planFlow := planPoolFlow[planName]
-
-	//计算计费周期
-	yearNumStr := gtime.Now().Format("Y")
-	monthNum := gtime.Now().Format("n")
-	lastMonth := gtime.Now().AddDate(0, -1, 0).Format("n") //上个月
-	nextMonth := gtime.Now().AddDate(0, +1, 0).Format("n") //上个月
-
-	//计费周期开始日期
-	startDayStr := yearNumStr + "-" + monthNum + "-27"
-	endDayStr := gconv.String(gtime.Now().Format("Y-m-d"))
-
-	if gconv.Int(gtime.Now().Format("j")) < 27 {
-		startDayStr = yearNumStr + "-" + lastMonth + "-27"
-		//到本月26日
-		endDayStr = yearNumStr + "-" + gconv.String(monthNum) + "-26"
-	} else {
-		startDayStr = yearNumStr + "-" + monthNum + "-27"
-		//到下个月26日
-		endDayStr = yearNumStr + "-" + gconv.String(nextMonth) + "-26"
-	}
-	//glog.Info("开始日期：",startDayStr)
-	//glog.Info("结束日期：",endDayStr)
-
-	dayStr := gtime.Now().AddDate(0, 0, 0).Format("Y-m-d")
-	//glog.Info("今天日期：",dayStr)
-
-	//计算已使用的天数
-	a, _ := time.Parse("2006-01-02", dayStr)
-	b, _ := time.Parse("2006-01-02", startDayStr)
-	useDayNumtmp := utils.TimeSub(a, b)
-	//已使用的天数
-	useDayNum := gconv.Int64(useDayNumtmp)
-	//glog.Info("已用天数：",useDayNum)
-
-	//计算剩余的天数
-	a2, _ := time.Parse("2006-01-02", endDayStr)
-	b2, _ := time.Parse("2006-01-02", dayStr)
-	remainderDayNumTmp := utils.TimeSub(a2, b2)
-	remainderDayNum := gconv.Int64(remainderDayNumTmp)
-
-	//glog.Info("剩余天数：",remainderDayNum)
-	var useFlow int64 = 0
-	for _, v := range simList {
-		useFlow = useFlow + v.Flow
-	}
-
-	//剩余流量
-	var surplusFlow int64 = 0
-	//超出流量
-	var outFlow int64 = 0
-	//计算剩余流量
-	surplusFlow = planFlow - useFlow
-	if surplusFlow < 0 {
-		outFlow = utils.Abs(surplusFlow)
-		surplusFlow = 0
-	}
-
-	planInfo := analyse.PlanInfo{}
-	planInfo.PlanName = planName
-	planInfo.Num = len(simList)
-	planInfo.AllFlow = planFlow / utils.MB1
-	planInfo.UseFlow = useFlow / utils.MB1
-	planInfo.AveDayFlow = useFlow / useDayNum / utils.MB1
-	planInfo.AveSimUseFlow = useFlow / gconv.Int64(len(simList)) / utils.MB1 //这个留MB适合
-	planInfo.SurplusFlow = surplusFlow / utils.MB1
-	planInfo.OutFlow = outFlow / utils.MB1
-	planInfo.RemainderDayNum = remainderDayNum
-	planInfo.ExpectFlow = useFlow / useDayNum * remainderDayNum / utils.MB1
-	return planInfo
-}
+//func (model SimUnicom) PlanCountInfo(planName string) analyse.PlanInfo {
+//
+//	var simList = make(map[string]analyse.PlanSimCardInfo)
+//	var resData []SimUnicom
+//	var err error
+//	if planName != "" {
+//		err = model.dbModel().Where(" rateplan = ?", planName).OrderBy("ctddatausage desc").Structs(&resData)
+//	} else {
+//		err = model.dbModel().Where(" 1 = ?", 1).OrderBy("ctddatausage desc").Structs(&resData)
+//	}
+//	if err != nil {
+//		//glog.Error(model.TableName()+" list error", err)
+//		return analyse.PlanInfo{}
+//	}
+//
+//	for _, v := range resData {
+//
+//		planSimCardInfo := analyse.PlanSimCardInfo{}
+//		planSimCardInfo.Flow = v.CtdDataUsage
+//		planSimCardInfo.Iccid = v.Iccid
+//		planSimCardInfo.PlanName = v.RatePlan
+//		simList[v.Iccid] = planSimCardInfo
+//
+//	}
+//
+//	//计算每种计费套餐的流量池的真实大小。
+//	planPoolFlow := countPlanFlow(resData)
+//	planFlow := planPoolFlow[planName]
+//
+//	//计算计费周期
+//	yearNumStr := gtime.Now().Format("Y")
+//	monthNum := gtime.Now().Format("n")
+//	lastMonth := gtime.Now().AddDate(0, -1, 0).Format("n") //上个月
+//	nextMonth := gtime.Now().AddDate(0, +1, 0).Format("n") //上个月
+//
+//	//计费周期开始日期
+//	startDayStr := yearNumStr + "-" + monthNum + "-27"
+//	endDayStr := gconv.String(gtime.Now().Format("Y-m-d"))
+//
+//	if gconv.Int(gtime.Now().Format("j")) < 27 {
+//		startDayStr = yearNumStr + "-" + lastMonth + "-27"
+//		//到本月26日
+//		endDayStr = yearNumStr + "-" + gconv.String(monthNum) + "-26"
+//	} else {
+//		startDayStr = yearNumStr + "-" + monthNum + "-27"
+//		//到下个月26日
+//		endDayStr = yearNumStr + "-" + gconv.String(nextMonth) + "-26"
+//	}
+//	//glog.Info("开始日期：",startDayStr)
+//	//glog.Info("结束日期：",endDayStr)
+//
+//	dayStr := gtime.Now().AddDate(0, 0, 0).Format("Y-m-d")
+//	//glog.Info("今天日期：",dayStr)
+//
+//	//计算已使用的天数
+//	a, _ := time.Parse("2006-01-02", dayStr)
+//	b, _ := time.Parse("2006-01-02", startDayStr)
+//	useDayNumtmp := utils.TimeSub(a, b)
+//	//已使用的天数
+//	useDayNum := gconv.Int64(useDayNumtmp)
+//	//glog.Info("已用天数：",useDayNum)
+//
+//	//计算剩余的天数
+//	a2, _ := time.Parse("2006-01-02", endDayStr)
+//	b2, _ := time.Parse("2006-01-02", dayStr)
+//	remainderDayNumTmp := utils.TimeSub(a2, b2)
+//	remainderDayNum := gconv.Int64(remainderDayNumTmp)
+//
+//	//glog.Info("剩余天数：",remainderDayNum)
+//	var useFlow int64 = 0
+//	for _, v := range simList {
+//		useFlow = useFlow + v.Flow
+//	}
+//
+//	//剩余流量
+//	var surplusFlow int64 = 0
+//	//超出流量
+//	var outFlow int64 = 0
+//	//计算剩余流量
+//	surplusFlow = planFlow - useFlow
+//	if surplusFlow < 0 {
+//		outFlow = utils.Abs(surplusFlow)
+//		surplusFlow = 0
+//	}
+//
+//	planInfo := analyse.PlanInfo{}
+//	planInfo.PlanName = planName
+//	planInfo.Num = len(simList)
+//	planInfo.AllFlow = planFlow / utils.MB1
+//	planInfo.UseFlow = useFlow / utils.MB1
+//	planInfo.AveDayFlow = useFlow / useDayNum / utils.MB1
+//	planInfo.AveSimUseFlow = useFlow / gconv.Int64(len(simList)) / utils.MB1 //这个留MB适合
+//	planInfo.SurplusFlow = surplusFlow / utils.MB1
+//	planInfo.OutFlow = outFlow / utils.MB1
+//	planInfo.RemainderDayNum = remainderDayNum
+//	planInfo.ExpectFlow = useFlow / useDayNum * remainderDayNum / utils.MB1
+//	return planInfo
+//}
 
 //计算流量池的真实大小：流量池中，当前计费周期内新激活的卡，流量是从卡激活的日期到计费结束日按每天流量累计的流量。
-func countPlanFlow(simList []SimUnicom) map[string]int64 {
-
-	var retData = make(map[string]int64, 3)
-	monthNum := gconv.Int64(gtime.Now().Format("n"))
-	yearNum := gconv.Int64(gtime.Now().Format("Y"))
-	toDayNum := gconv.Int64(gtime.Now().Format("j"))
-	endYear := yearNum
-	endMonth := monthNum
-	if toDayNum > 26 {
-		endMonth = endMonth + 1
-		if monthNum == 12 {
-			endYear = endYear + 1
-			endMonth = 1
-		}
-	}
-
-	var G1DayFlow int64 = utils.G1 / 30
-	var G2DayFlow int64 = utils.G1 * 2 / 30
-	var G3DayFlow int64 = utils.G1 * 3 / 30
-
-	for _, v := range simList {
-		//dateActivated
-		var remainderDayNum int64 = 30
-		if v.DateActivated != "" {
-			tmpTime := gconv.Int64(v.DateActivated)
-			simCardActivatedYear := gconv.Int64(gtime.NewFromTimeStamp(tmpTime).Format("Y"))
-			simCardActivatedMonth := gconv.Int64(gtime.NewFromTimeStamp(tmpTime).Format("n"))
-			if simCardActivatedYear == yearNum && simCardActivatedMonth == monthNum {
-				simCardActivatedDate := gtime.NewFromTimeStamp(tmpTime).Format("Y-m-d")
-				endDayStr := gconv.String(endYear) + "-" + gconv.String(endMonth) + "-26"
-				//计算剩余的天数
-				a2, _ := time.Parse("2006-01-02", endDayStr)
-				b2, _ := time.Parse("2006-01-02", simCardActivatedDate)
-				remainderDayNumTmp := utils.TimeSub(a2, b2)
-				remainderDayNum = gconv.Int64(remainderDayNumTmp)
-			}
-
-		}
-
-		switch v.RatePlan {
-		case Plan01:
-			retData[Plan01] = retData[Plan01] + remainderDayNum*G1DayFlow
-
-		case Plan02:
-			retData[Plan02] = retData[Plan02] + +remainderDayNum*G2DayFlow
-
-		case Plan03:
-			retData[Plan03] = retData[Plan03] + +remainderDayNum*G3DayFlow
-
-		}
-	}
-	return retData
-}
+//func countPlanFlow(simList []SimUnicom) map[string]int64 {
+//
+//	var retData = make(map[string]int64, 3)
+//	monthNum := gconv.Int64(gtime.Now().Format("n"))
+//	yearNum := gconv.Int64(gtime.Now().Format("Y"))
+//	toDayNum := gconv.Int64(gtime.Now().Format("j"))
+//	endYear := yearNum
+//	endMonth := monthNum
+//	if toDayNum > 26 {
+//		endMonth = endMonth + 1
+//		if monthNum == 12 {
+//			endYear = endYear + 1
+//			endMonth = 1
+//		}
+//	}
+//
+//	var G1DayFlow int64 = utils.G1 / 30
+//	var G2DayFlow int64 = utils.G1 * 2 / 30
+//	var G3DayFlow int64 = utils.G1 * 3 / 30
+//
+//	for _, v := range simList {
+//		//dateActivated
+//		var remainderDayNum int64 = 30
+//		if v.DateActivated != "" {
+//			tmpTime := gconv.Int64(v.DateActivated)
+//			simCardActivatedYear := gconv.Int64(gtime.NewFromTimeStamp(tmpTime).Format("Y"))
+//			simCardActivatedMonth := gconv.Int64(gtime.NewFromTimeStamp(tmpTime).Format("n"))
+//			if simCardActivatedYear == yearNum && simCardActivatedMonth == monthNum {
+//				simCardActivatedDate := gtime.NewFromTimeStamp(tmpTime).Format("Y-m-d")
+//				endDayStr := gconv.String(endYear) + "-" + gconv.String(endMonth) + "-26"
+//				//计算剩余的天数
+//				a2, _ := time.Parse("2006-01-02", endDayStr)
+//				b2, _ := time.Parse("2006-01-02", simCardActivatedDate)
+//				remainderDayNumTmp := utils.TimeSub(a2, b2)
+//				remainderDayNum = gconv.Int64(remainderDayNumTmp)
+//			}
+//
+//		}
+//
+//		switch v.RatePlan {
+//		case Plan01:
+//			retData[Plan01] = retData[Plan01] + remainderDayNum*G1DayFlow
+//
+//		case Plan02:
+//			retData[Plan02] = retData[Plan02] + +remainderDayNum*G2DayFlow
+//
+//		case Plan03:
+//			retData[Plan03] = retData[Plan03] + +remainderDayNum*G3DayFlow
+//
+//		}
+//	}
+//	return retData
+//}
 
 //SaveUnicomSimInfo 存储联通sim卡详细信息到数据表
 func (model SimUnicom) SaveUnicomSimInfo(sim unicommodel.SimInfo) error {

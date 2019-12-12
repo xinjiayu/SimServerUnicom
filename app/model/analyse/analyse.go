@@ -16,16 +16,16 @@ type PlanSimCardInfo struct {
 
 //计费套餐计划信息结构
 type PlanInfo struct {
-	PlanName        string
-	AllFlow         int64 //流量池总流量
-	UseFlow         int64 //已用流量
-	AveSimUseFlow   int64 //每个卡已用平均流量
-	AveDayFlow      int64 //日均流量
-	SurplusFlow     int64 //剩余流量
-	OutFlow         int64 //超出流量
-	ExpectFlow      int64 //预计需要的流量
-	RemainderDayNum int64 //剩余天数
-	Num             int
+	PlanName      string
+	AllFlow       int64 //流量池总流量
+	UseFlow       int64 //已用流量
+	AveSimUseFlow int64 //每个卡已用平均流量
+	AveDayFlow    int64 //日均流量
+	SurplusFlow   int64 //剩余流量
+	OutFlow       int64 //超出流量
+	ExpectFlow    int64 //预计需要的流量
+	SurplusDayNum int64 //剩余天数
+	Num           int
 }
 
 //指定卡两个月流量统计信息结构
